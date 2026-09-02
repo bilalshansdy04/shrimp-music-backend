@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -15,15 +14,28 @@ import (
 func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error) {
 	url := "https://music.youtube.com/youtubei/v1/search"
 	
-	payload := map[string]interface{}{
-		"context": map[string]interface{}{
-			"client": map[string]interface{}{
-				"clientName":    "WEB_REMIX",
-				"clientVersion": "1.20230524.01.00",
+	type ClientCtx struct {
+		ClientName    string `json:"clientName"`
+		ClientVersion string `json:"clientVersion"`
+	}
+	type Context struct {
+		Client ClientCtx `json:"client"`
+	}
+	type SearchPayload struct {
+		Context Context `json:"context"`
+		Query   string  `json:"query"`
+		Params  string  `json:"params"`
+	}
+	
+	payload := SearchPayload{
+		Context: Context{
+			Client: ClientCtx{
+				ClientName:    "WEB_REMIX",
+				ClientVersion: "1.20230524.01.00",
 			},
 		},
-		"query": query,
-		"params": "Eg-KAQwIARAUGAMgAQ==", // YouTube Music 'Songs' filter
+		Query:  query,
+		Params: "Eg-KAQwIARAUGAMgAQ==", // YouTube Music 'Songs' filter
 	}
 	
 	b, err := json.Marshal(payload)
@@ -164,7 +176,6 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 		}
 		
 		if isInvalid {
-			fmt.Printf("Filtered out: %s by %s\n", title, artist)
 			continue // Skip podcast/episode results
 		}
 		
