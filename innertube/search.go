@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -84,6 +83,7 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 	
 	for _, item := range items {
 		var videoId, title, artist, thumbnail string
+		isVideo := false
 		
 		// 1. Get Video ID
 		if overlay, ok := item["overlay"].(map[string]interface{}); ok {
@@ -147,6 +147,9 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 									if r, ok := run.(map[string]interface{}); ok {
 										if t, ok := r["text"].(string); ok {
 											// Clean up separators
+											if t == "Video" {
+												isVideo = true
+											}
 											if t != " • " && t != "Song" && !strings.Contains(t, "views") {
 												artistParts = append(artistParts, t)
 											}
@@ -161,17 +164,16 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 			}
 		}
 		
-		// Filter out noisy search results (MV, live performances)
-		// Usually if it's officially categorized, it works better
-		// Just returning the ones that have a valid VideoID is often enough, 
-		// because the API with that param strongly favors songs.
+		if isVideo {
+			continue // Skip video results, act like Spotify
+		}
 		
 		results = append(results, ytdlp.SearchResult{
 			ID:        videoId,
 			Title:     title,
 			Artist:    artist,
 			Thumbnail: thumbnail,
-			Duration:  0, // Duration parsing omitted for brevity, will just be 0 for now
+			Duration:  0,
 		})
 		
 		if len(results) >= 10 {
@@ -180,7 +182,7 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 	}
 	
 	if len(results) == 0 {
-		return nil, fmt.Errorf("no songs found")
+		return []ytdlp.SearchResult{}, nil
 	}
 	
 	return results, nil
