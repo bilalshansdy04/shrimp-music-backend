@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/shrimp-music/backend/api"
 	"github.com/shrimp-music/backend/cache"
 	"github.com/shrimp-music/backend/db"
@@ -19,6 +20,11 @@ import (
 
 func main() {
 	fmt.Println("🦐 Shrimp Music Resolver Starting...")
+
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, relying on environment variables.")
+	}
 
 	// Initialize Database
 	db.InitDB()
