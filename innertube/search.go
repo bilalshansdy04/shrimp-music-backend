@@ -146,7 +146,7 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 									if r, ok := run.(map[string]interface{}); ok {
 										if t, ok := r["text"].(string); ok {
 											// Clean up separators
-											if t == "Episode" || t == "Podcast" {
+											if t == "Video" || t == "Episode" || t == "Podcast" {
 												isInvalid = true
 											}
 											if t != " • " && t != "Song" && !strings.Contains(t, "views") {
