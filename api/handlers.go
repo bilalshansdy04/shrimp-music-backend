@@ -28,6 +28,13 @@ func NewAPI(c *cache.Cache, l limiter.Semaphore) *API {
 func (api *API) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/search", api.handleSearch)
 	mux.HandleFunc("/api/v1/resolve/", api.handleResolve)
+
+	// Auth Routes
+	mux.HandleFunc("/api/auth/register", RegisterHandler)
+	mux.HandleFunc("/api/auth/login", LoginHandler)
+	mux.HandleFunc("/api/auth/devices", AuthMiddleware(DevicesHandler))
+	mux.HandleFunc("/api/auth/logout", AuthMiddleware(LogoutHandler))
+	mux.HandleFunc("/api/auth/logout-all", AuthMiddleware(LogoutAllHandler))
 }
 
 func (api *API) handleSearch(w http.ResponseWriter, r *http.Request) {

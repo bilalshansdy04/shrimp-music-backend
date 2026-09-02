@@ -12,12 +12,16 @@ import (
 
 	"github.com/shrimp-music/backend/api"
 	"github.com/shrimp-music/backend/cache"
+	"github.com/shrimp-music/backend/db"
 	"github.com/shrimp-music/backend/limiter"
 	"github.com/shrimp-music/backend/ytdlp"
 )
 
 func main() {
 	fmt.Println("🦐 Shrimp Music Resolver Starting...")
+
+	// Initialize Database
+	db.InitDB()
 
 	// Initialize Cache
 	c := cache.New()
