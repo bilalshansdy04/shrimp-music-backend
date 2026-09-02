@@ -11,20 +11,25 @@ import (
 	"github.com/shrimp-music/backend/ytdlp"
 )
 
-func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error) {
+type UniversalSearchResult struct {
+	Tracks  []ytdlp.SearchResult "json:\"tracks\""
+	Artists []ytdlp.SearchResult "json:\"artists\""
+	Albums  []ytdlp.SearchResult "json:\"albums\""
+}
+
+func SearchUniversal(ctx context.Context, query string) (*UniversalSearchResult, error) {
 	url := "https://music.youtube.com/youtubei/v1/search"
 	
 	type ClientCtx struct {
-		ClientName    string `json:"clientName"`
-		ClientVersion string `json:"clientVersion"`
+		ClientName    string "json:\"clientName\""
+		ClientVersion string "json:\"clientVersion\""
 	}
 	type Context struct {
-		Client ClientCtx `json:"client"`
+		Client ClientCtx "json:\"client\""
 	}
 	type SearchPayload struct {
-		Context Context `json:"context"`
-		Query   string  `json:"query"`
-		Params  string  `json:"params"`
+		Context Context "json:\"context\""
+		Query   string  "json:\"query\""
 	}
 	
 	payload := SearchPayload{
@@ -34,8 +39,7 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 				ClientVersion: "1.20230524.01.00",
 			},
 		},
-		Query:  query,
-		Params: "Eg-KAQwIARAUGAMgAQ==", // YouTube Music 'Songs' filter
+		Query: query,
 	}
 	
 	b, err := json.Marshal(payload)
@@ -66,9 +70,12 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 		return nil, err
 	}
 	
-	var results []ytdlp.SearchResult
+	result := &UniversalSearchResult{
+		Tracks:  make([]ytdlp.SearchResult, 0),
+		Artists: make([]ytdlp.SearchResult, 0),
+		Albums:  make([]ytdlp.SearchResult, 0),
+	}
 	
-	// Helper to find musicResponsiveListItemRenderer
 	var findItems func(v interface{}) []map[string]interface{}
 	findItems = func(v interface{}) []map[string]interface{} {
 		var res []map[string]interface{}
@@ -93,31 +100,9 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 	items := findItems(data)
 	
 	for _, item := range items {
-		var videoId, title, artist, thumbnail string
-		isInvalid := false
+		var id, title, subtitle, thumbnail string
+		var entityType string 
 		
-		// 1. Get Video ID
-		if overlay, ok := item["overlay"].(map[string]interface{}); ok {
-			if renderer, ok := overlay["musicItemThumbnailOverlayRenderer"].(map[string]interface{}); ok {
-				if content, ok := renderer["content"].(map[string]interface{}); ok {
-					if playBtn, ok := content["musicPlayButtonRenderer"].(map[string]interface{}); ok {
-						if endp, ok := playBtn["playNavigationEndpoint"].(map[string]interface{}); ok {
-							if watchEndp, ok := endp["watchEndpoint"].(map[string]interface{}); ok {
-								if vid, ok := watchEndp["videoId"].(string); ok {
-									videoId = vid
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		
-		if videoId == "" {
-			continue // skip if not a playable track
-		}
-		
-		// 2. Get Thumbnail
 		if thumbObj, ok := item["thumbnail"].(map[string]interface{}); ok {
 			if renderer, ok := thumbObj["musicThumbnailRenderer"].(map[string]interface{}); ok {
 				if thumb, ok := renderer["thumbnail"].(map[string]interface{}); ok {
@@ -130,9 +115,7 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 			}
 		}
 		
-		// 3. Get Title & Artist
 		if flexColumns, ok := item["flexColumns"].([]interface{}); ok {
-			// Title is usually in flexColumns[0]
 			if len(flexColumns) > 0 {
 				if col0, ok := flexColumns[0].(map[string]interface{}); ok {
 					if renderer, ok := col0["musicResponsiveListItemFlexColumnRenderer"].(map[string]interface{}); ok {
@@ -146,28 +129,22 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 					}
 				}
 			}
-			
-			// Artist is usually in flexColumns[1]
 			if len(flexColumns) > 1 {
 				if col1, ok := flexColumns[1].(map[string]interface{}); ok {
 					if renderer, ok := col1["musicResponsiveListItemFlexColumnRenderer"].(map[string]interface{}); ok {
 						if text, ok := renderer["text"].(map[string]interface{}); ok {
 							if runs, ok := text["runs"].([]interface{}); ok {
-								var artistParts []string
+								var parts []string
 								for _, run := range runs {
 									if r, ok := run.(map[string]interface{}); ok {
 										if t, ok := r["text"].(string); ok {
-											// Clean up separators
-											if t == "Video" || t == "Episode" || t == "Podcast" {
-												isInvalid = true
-											}
-											if t != " • " && t != "Song" && !strings.Contains(t, "views") {
-												artistParts = append(artistParts, t)
+											if t != " • " {
+												parts = append(parts, t)
 											}
 										}
 									}
 								}
-								artist = strings.Join(artistParts, ", ")
+								subtitle = strings.Join(parts, " • ")
 							}
 						}
 					}
@@ -175,26 +152,81 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 			}
 		}
 		
-		if isInvalid {
-			continue // Skip podcast/episode results
+		if nav, ok := item["navigationEndpoint"].(map[string]interface{}); ok {
+			if browse, ok := nav["browseEndpoint"].(map[string]interface{}); ok {
+				if bId, ok := browse["browseId"].(string); ok {
+					id = bId
+					if strings.HasPrefix(bId, "UC") {
+						entityType = "artist"
+					} else if strings.HasPrefix(bId, "MPRE") {
+						entityType = "album"
+					}
+				}
+			} else if watch, ok := nav["watchEndpoint"].(map[string]interface{}); ok {
+				if vId, ok := watch["videoId"].(string); ok {
+					id = vId
+					entityType = "track"
+				}
+			}
 		}
 		
-		results = append(results, ytdlp.SearchResult{
-			ID:        videoId,
+		if id == "" {
+			if overlay, ok := item["overlay"].(map[string]interface{}); ok {
+				if renderer, ok := overlay["musicItemThumbnailOverlayRenderer"].(map[string]interface{}); ok {
+					if content, ok := renderer["content"].(map[string]interface{}); ok {
+						if playBtn, ok := content["musicPlayButtonRenderer"].(map[string]interface{}); ok {
+							if endp, ok := playBtn["playNavigationEndpoint"].(map[string]interface{}); ok {
+								if watchEndp, ok := endp["watchEndpoint"].(map[string]interface{}); ok {
+									if vId, ok := watchEndp["videoId"].(string); ok {
+										id = vId
+										entityType = "track"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		if id == "" || entityType == "" {
+			continue 
+		}
+
+		resItem := ytdlp.SearchResult{
+			ID:        id,
 			Title:     title,
-			Artist:    artist,
+			Artist:    subtitle, 
 			Thumbnail: thumbnail,
 			Duration:  0,
-		})
-		
-		if len(results) >= 10 {
-			break
+		}
+
+		if entityType == "track" {
+			if strings.Contains(resItem.Artist, "views") || strings.Contains(resItem.Artist, "Episode") || strings.Contains(resItem.Artist, "Podcast") {
+				continue
+			}
+			resItem.Artist = strings.Replace(resItem.Artist, "Song • ", "", 1)
+			resItem.Artist = strings.Replace(resItem.Artist, "Video • ", "", 1)
+			exists := false
+			for _, t := range result.Tracks {
+				if t.ID == resItem.ID {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				result.Tracks = append(result.Tracks, resItem)
+			}
+		} else if entityType == "artist" {
+			resItem.Artist = strings.Replace(resItem.Artist, "Artist • ", "", 1)
+			result.Artists = append(result.Artists, resItem)
+		} else if entityType == "album" {
+			resItem.Artist = strings.Replace(resItem.Artist, "Single • ", "", 1)
+			resItem.Artist = strings.Replace(resItem.Artist, "EP • ", "", 1)
+			resItem.Artist = strings.Replace(resItem.Artist, "Album • ", "", 1)
+			result.Albums = append(result.Albums, resItem)
 		}
 	}
 	
-	if len(results) == 0 {
-		return []ytdlp.SearchResult{}, nil
-	}
-	
-	return results, nil
+	return result, nil
 }

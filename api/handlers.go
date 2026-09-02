@@ -49,8 +49,13 @@ func (api *API) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	searchType := r.URL.Query().Get("type")
+	if searchType == "" {
+		searchType = "all"
+	}
+
 	// Check Cache
-	cacheKey := "search:" + query
+	cacheKey := "search:" + query + ":" + searchType
 	if val, ok := api.cache.Get(cacheKey); ok {
 		api.jsonResponse(w, http.StatusOK, val)
 		return
@@ -66,15 +71,28 @@ func (api *API) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	defer api.limiter.Release()
 
-	results, err := innertube.SearchSongs(ctx, query)
+	// Perform Universal Search
+	results, err := innertube.SearchUniversal(ctx, query)
 	if err != nil {
 		http.Error(w, "Search failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Filter by searchType if necessary
+	var finalData interface{}
+	if searchType == "track" {
+		finalData = results.Tracks
+	} else if searchType == "artist" {
+		finalData = results.Artists
+	} else if searchType == "album" {
+		finalData = results.Albums
+	} else {
+		finalData = results // all
+	}
+
 	response := map[string]interface{}{
 		"status": "success",
-		"data":   results,
+		"data":   finalData,
 	}
 
 	// Cache for 1 hour
@@ -147,3 +165,4 @@ func (api *API) jsonResponse(w http.ResponseWriter, status int, payload interfac
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(payload)
 }
+
