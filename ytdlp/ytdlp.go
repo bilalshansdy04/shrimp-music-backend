@@ -65,10 +65,10 @@ func Search(ctx context.Context, query string) ([]SearchResult, error) {
 func Resolve(ctx context.Context, videoID string, format string) (string, error) {
 	url := fmt.Sprintf("https://www.youtube.com/watch?v=%s", videoID)
 	
-	// Default to Best Audio. If format=="video", use Best Video+Audio ("b")
+	// Default to Best Audio. If format=="video", use Best Video+Audio ("b/ba")
 	ytFormat := "ba[ext=m4a]/ba"
 	if format == "video" {
-		ytFormat = "b"
+		ytFormat = "b/ba"
 	}
 
 	cmd := exec.CommandContext(ctx, "./yt-dlp.exe",
