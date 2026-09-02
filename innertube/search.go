@@ -36,8 +36,6 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// Optional: add User-Agent to avoid blocks
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	
 	client := &http.Client{}
 	resp, err := client.Do(req)
