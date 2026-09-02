@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -83,7 +84,7 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 	
 	for _, item := range items {
 		var videoId, title, artist, thumbnail string
-		isVideo := false
+		isInvalid := false
 		
 		// 1. Get Video ID
 		if overlay, ok := item["overlay"].(map[string]interface{}); ok {
@@ -147,8 +148,8 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 									if r, ok := run.(map[string]interface{}); ok {
 										if t, ok := r["text"].(string); ok {
 											// Clean up separators
-											if t == "Video" || t == "Episode" || t == "Podcast" {
-												isVideo = true
+											if t == "Episode" || t == "Podcast" {
+												isInvalid = true
 											}
 											if t != " • " && t != "Song" && !strings.Contains(t, "views") {
 												artistParts = append(artistParts, t)
@@ -164,8 +165,9 @@ func SearchSongs(ctx context.Context, query string) ([]ytdlp.SearchResult, error
 			}
 		}
 		
-		if isVideo {
-			continue // Skip video results, act like Spotify
+		if isInvalid {
+			fmt.Printf("Filtered out: %s by %s\n", title, artist)
+			continue // Skip podcast/episode results
 		}
 		
 		results = append(results, ytdlp.SearchResult{
