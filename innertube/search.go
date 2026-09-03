@@ -86,6 +86,34 @@ func SearchUniversal(ctx context.Context, query string) (*UniversalSearchResult,
 					res = append(res, m)
 				}
 			}
+			if card, ok := val["musicCardShelfRenderer"]; ok {
+				if mCard, ok := card.(map[string]interface{}); ok {
+					fakeItem := map[string]interface{}{
+						"thumbnail": mCard["thumbnail"],
+						"flexColumns": []interface{}{
+							map[string]interface{}{
+								"musicResponsiveListItemFlexColumnRenderer": map[string]interface{}{
+									"text": mCard["title"],
+								},
+							},
+							map[string]interface{}{
+								"musicResponsiveListItemFlexColumnRenderer": map[string]interface{}{
+									"text": mCard["subtitle"],
+								},
+							},
+						},
+					}
+					if titleObj, ok := mCard["title"].(map[string]interface{}); ok {
+						if runs, ok := titleObj["runs"].([]interface{}); ok && len(runs) > 0 {
+							if run0, ok := runs[0].(map[string]interface{}); ok {
+								fakeItem["navigationEndpoint"] = run0["navigationEndpoint"]
+							}
+						}
+					}
+					// Only prepend to make sure it appears first
+					res = append([]map[string]interface{}{fakeItem}, res...)
+				}
+			}
 			for _, child := range val {
 				res = append(res, findItems(child)...)
 			}
