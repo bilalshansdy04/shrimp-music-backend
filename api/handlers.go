@@ -32,6 +32,7 @@ func (api *API) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/album", api.handleAlbum)
 
 	// Auth Routes
+	mux.HandleFunc("/api/auth/check-username", CheckUsernameHandler)
 	mux.HandleFunc("/api/auth/register", RegisterHandler)
 	mux.HandleFunc("/api/auth/login", LoginHandler)
 	mux.HandleFunc("/api/auth/devices", AuthMiddleware(DevicesHandler))
