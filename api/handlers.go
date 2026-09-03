@@ -28,6 +28,8 @@ func NewAPI(c *cache.Cache, l limiter.Semaphore) *API {
 func (api *API) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/search", api.handleSearch)
 	mux.HandleFunc("/api/v1/resolve/", api.handleResolve)
+	mux.HandleFunc("/api/v1/artist", api.handleArtist)
+	mux.HandleFunc("/api/v1/album", api.handleAlbum)
 
 	// Auth Routes
 	mux.HandleFunc("/api/auth/register", RegisterHandler)
@@ -166,3 +168,89 @@ func (api *API) jsonResponse(w http.ResponseWriter, status int, payload interfac
 	json.NewEncoder(w).Encode(payload)
 }
 
+
+func (api *API) handleArtist(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing query parameter 'id'", http.StatusBadRequest)
+		return
+	}
+
+	// Check Cache
+	cacheKey := "artist:" + id
+	if val, ok := api.cache.Get(cacheKey); ok {
+		api.jsonResponse(w, http.StatusOK, val)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	if err := api.limiter.Acquire(ctx); err != nil {
+		http.Error(w, "Server too busy", http.StatusServiceUnavailable)
+		return
+	}
+	defer api.limiter.Release()
+
+	profile, err := innertube.GetArtistProfile(ctx, id)
+	if err != nil {
+		http.Error(w, "Failed to get artist profile: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"status": "success",
+		"data":   profile,
+	}
+
+	api.cache.Set(cacheKey, response, 1*time.Hour)
+	api.jsonResponse(w, http.StatusOK, response)
+}
+
+func (api *API) handleAlbum(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing query parameter 'id'", http.StatusBadRequest)
+		return
+	}
+
+	// Check Cache
+	cacheKey := "album:" + id
+	if val, ok := api.cache.Get(cacheKey); ok {
+		api.jsonResponse(w, http.StatusOK, val)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	if err := api.limiter.Acquire(ctx); err != nil {
+		http.Error(w, "Server too busy", http.StatusServiceUnavailable)
+		return
+	}
+	defer api.limiter.Release()
+
+	profile, err := innertube.GetAlbumProfile(ctx, id)
+	if err != nil {
+		http.Error(w, "Failed to get album profile: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"status": "success",
+		"data":   profile,
+	}
+
+	api.cache.Set(cacheKey, response, 1*time.Hour)
+	api.jsonResponse(w, http.StatusOK, response)
+}
