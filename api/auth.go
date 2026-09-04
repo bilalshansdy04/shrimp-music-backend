@@ -1,4 +1,4 @@
-package api
+﻿package api
 
 import (
 	"crypto/sha256"
@@ -13,12 +13,12 @@ import (
 )
 
 type RegisterReq struct {
-	Email    string `json:"email"`
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 type LoginReq struct {
-	Email      string `json:"email"`
+	Username   string `json:"username"`
 	Password   string `json:"password"`
 	DeviceName string `json:"device_name"`
 }
@@ -30,8 +30,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" || req.Password == "" {
-		http.Error(w, "Email and password are required", http.StatusBadRequest)
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "Username and password are required", http.StatusBadRequest)
 		return
 	}
 
@@ -42,16 +42,17 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := uuid.New().String()
-	_, err = db.DB.Exec("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)", userID, req.Email, string(hashedPassword))
+	_, err = db.DB.Exec("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)", userID, req.Username, string(hashedPassword))
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
-			http.Error(w, "Email already exists", http.StatusConflict)
+			http.Error(w, "Username already exists", http.StatusConflict)
 			return
 		}
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully", "user_id": userID})
 }
@@ -64,14 +65,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID, hash string
-	err := db.DB.QueryRow("SELECT id, password_hash FROM users WHERE email = ?", req.Email).Scan(&userID, &hash)
+	err := db.DB.QueryRow("SELECT id, password_hash FROM users WHERE username = ?", req.Username).Scan(&userID, &hash)
 	if err != nil {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
@@ -101,6 +102,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"token": rawToken, // Give raw token to user
 	})
@@ -130,6 +132,7 @@ func DevicesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(devices)
 }
 
@@ -150,12 +153,13 @@ func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to logout from all devices", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out from all devices"})
 }
 
 
 type CheckUsernameReq struct {
-	Email string `json:"email"`
+	Username string `json:"username"`
 }
 
 func CheckUsernameHandler(w http.ResponseWriter, r *http.Request) {
@@ -165,19 +169,22 @@ func CheckUsernameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" {
+	if req.Username == "" {
 		http.Error(w, "Username is required", http.StatusBadRequest)
 		return
 	}
 
 	var exists bool
-	err := db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", req.Email).Scan(&exists)
+	err := db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", req.Username).Scan(&exists)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"exists": exists,
 	})
 }
+
+

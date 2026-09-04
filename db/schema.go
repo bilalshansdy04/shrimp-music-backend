@@ -1,4 +1,4 @@
-package db
+﻿package db
 
 import (
 	"log"
@@ -8,7 +8,7 @@ func InitSchema() {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
-			email TEXT NOT NULL UNIQUE,
+			username TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);`,
@@ -81,4 +81,5 @@ func InitSchema() {
 	}
 	log.Println("Database schemas initialized.")
 }
+
 
