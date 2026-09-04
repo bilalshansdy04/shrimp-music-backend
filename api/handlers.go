@@ -31,6 +31,31 @@ func (api *API) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/artist", api.handleArtist)
 	mux.HandleFunc("/api/v1/album", api.handleAlbum)
 
+	// Playlist Routes
+	mux.HandleFunc("/api/v1/playlists", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			GetPlaylistsHandler(w, r)
+		} else if r.Method == http.MethodPost {
+			CreatePlaylistHandler(w, r)
+		} else if r.Method == http.MethodDelete {
+			DeletePlaylistHandler(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.HandleFunc("/api/v1/playlists/tracks", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			GetPlaylistTracksHandler(w, r)
+		} else if r.Method == http.MethodPost {
+			AddTrackToPlaylistHandler(w, r)
+		} else if r.Method == http.MethodDelete {
+			RemoveTrackFromPlaylistHandler(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
 	// Auth Routes
 	mux.HandleFunc("/api/auth/check-username", CheckUsernameHandler)
 	mux.HandleFunc("/api/auth/register", RegisterHandler)
