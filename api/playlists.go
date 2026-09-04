@@ -41,7 +41,7 @@ func GetPlaylistsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var playlists []Playlist
+	playlists := []Playlist{}
 	for rows.Next() {
 		var p Playlist
 		var desc sql.NullString
@@ -235,4 +235,5 @@ func RemoveTrackFromPlaylistHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Track removed"})
 }
+
 
