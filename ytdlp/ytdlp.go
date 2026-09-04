@@ -1,4 +1,4 @@
-package ytdlp
+﻿package ytdlp
 
 import (
 	"context"
@@ -15,6 +15,7 @@ type SearchResult struct {
 	Artist    string `json:"artist"`
 	Duration  int    `json:"duration"`
 	Thumbnail string `json:"thumbnail"`
+	Type      string `json:"type,omitempty"`
 }
 
 func Search(ctx context.Context, query string) ([]SearchResult, error) {
@@ -66,12 +67,13 @@ func Resolve(ctx context.Context, videoID string, format string) (string, error)
 	url := fmt.Sprintf("https://www.youtube.com/watch?v=%s", videoID)
 	
 	// Default to Best Audio. If format=="video", use Best Video+Audio ("b/ba")
-	ytFormat := "ba[ext=m4a]/ba"
+	ytFormat := "ba[ext=m4a]/ba/b" // Fallback to b (video+audio) if ba is missing due to SABR/429
 	if format == "video" {
 		ytFormat = "b/ba"
 	}
 
 	cmd := exec.CommandContext(ctx, "./yt-dlp.exe",
+		"--extractor-args", "youtube:player_client=android", // Bypass 429 web client ban
 		"--no-warnings",
 		"--no-call-home",
 		"--no-check-certificates",
@@ -114,3 +116,4 @@ func UpdateYtDlp() error {
 	}
 	return nil
 }
+
